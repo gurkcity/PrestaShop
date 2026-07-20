@@ -1,27 +1,7 @@
 <?php
 /**
- * Copyright since 2007 PrestaShop SA and Contributors
- * PrestaShop is an International Registered Trademark & Property of PrestaShop SA
- *
- * NOTICE OF LICENSE
- *
- * This source file is subject to the Open Software License (OSL 3.0)
- * that is bundled with this package in the file LICENSE.md.
- * It is also available through the world-wide-web at this URL:
- * https://opensource.org/licenses/OSL-3.0
- * If you did not receive a copy of the license and are unable to
- * obtain it through the world-wide-web, please send an email
- * to license@prestashop.com so we can send you a copy immediately.
- *
- * DISCLAIMER
- *
- * Do not edit or add to this file if you wish to upgrade PrestaShop to newer
- * versions in the future. If you wish to customize PrestaShop for your
- * needs please refer to https://devdocs.prestashop.com/ for more information.
- *
- * @author    PrestaShop SA and Contributors <contact@prestashop.com>
- * @copyright Since 2007 PrestaShop SA and Contributors
- * @license   https://opensource.org/licenses/OSL-3.0 Open Software License (OSL 3.0)
+ * For the full copyright and license information, please view the
+ * docs/licenses/LICENSE.txt file that was distributed with this source code.
  */
 
 declare(strict_types=1);
@@ -37,6 +17,7 @@ use OrderInvoice;
 use PrestaShop\PrestaShop\Adapter\ContextStateManager;
 use PrestaShop\PrestaShop\Adapter\Order\OrderDetailUpdater;
 use PrestaShop\PrestaShop\Adapter\Order\OrderProductQuantityUpdater;
+use PrestaShop\PrestaShop\Core\CommandBus\Attributes\AsCommandHandler;
 use PrestaShop\PrestaShop\Core\Domain\Order\Exception\CannotEditDeliveredOrderProductException;
 use PrestaShop\PrestaShop\Core\Domain\Order\Exception\CannotFindProductInOrderException;
 use PrestaShop\PrestaShop\Core\Domain\Order\Exception\DuplicateProductInOrderInvoiceException;
@@ -51,6 +32,7 @@ use Validate;
 /**
  * @internal
  */
+#[AsCommandHandler]
 final class UpdateProductInOrderHandler extends AbstractOrderCommandHandler implements UpdateProductInOrderHandlerInterface
 {
     /**
@@ -119,11 +101,15 @@ final class UpdateProductInOrderHandler extends AbstractOrderCommandHandler impl
                 (int) $orderDetail->product_id,
                 (int) $orderDetail->product_attribute_id,
                 $command->getPriceTaxExcluded(),
-                $command->getPriceTaxIncluded()
+                $command->getPriceTaxIncluded(),
+                (int) $orderDetail->id_customization
             );
 
             // Update invoice, quantity and amounts
             $order = $this->orderProductQuantityUpdater->update($order, $orderDetail, $command->getQuantity(), $orderInvoice);
+
+            // Update order_detail_tax table without modifying prices
+            $this->orderDetailUpdater->updateOrderDetailTaxTableOnly($order);
 
             Hook::exec('actionOrderEdited', ['order' => $order]);
         } catch (Exception $e) {
@@ -145,7 +131,7 @@ final class UpdateProductInOrderHandler extends AbstractOrderCommandHandler impl
         UpdateProductInOrderCommand $command,
         OrderDetail $orderDetail,
         Order $order,
-        OrderInvoice $orderInvoice = null
+        ?OrderInvoice $orderInvoice = null
     ) {
         // assert product exists
         $product = new Product($orderDetail->product_id);
@@ -186,7 +172,7 @@ final class UpdateProductInOrderHandler extends AbstractOrderCommandHandler impl
             throw new OrderException('Invalid quantity');
         }
 
-        //check if product is available in stock
+        // check if product is available in stock
         if (!Product::isAvailableWhenOutOfStock(StockAvailable::outOfStock($orderDetail->product_id))) {
             $availableQuantity = StockAvailable::getQuantityAvailableByProduct(
                 $orderDetail->product_id,

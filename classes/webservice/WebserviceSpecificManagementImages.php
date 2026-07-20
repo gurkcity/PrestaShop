@@ -1,27 +1,7 @@
 <?php
 /**
- * Copyright since 2007 PrestaShop SA and Contributors
- * PrestaShop is an International Registered Trademark & Property of PrestaShop SA
- *
- * NOTICE OF LICENSE
- *
- * This source file is subject to the Open Software License (OSL 3.0)
- * that is bundled with this package in the file LICENSE.md.
- * It is also available through the world-wide-web at this URL:
- * https://opensource.org/licenses/OSL-3.0
- * If you did not receive a copy of the license and are unable to
- * obtain it through the world-wide-web, please send an email
- * to license@prestashop.com so we can send you a copy immediately.
- *
- * DISCLAIMER
- *
- * Do not edit or add to this file if you wish to upgrade PrestaShop to newer
- * versions in the future. If you wish to customize PrestaShop for your
- * needs please refer to https://devdocs.prestashop.com/ for more information.
- *
- * @author    PrestaShop SA and Contributors <contact@prestashop.com>
- * @copyright Since 2007 PrestaShop SA and Contributors
- * @license   https://opensource.org/licenses/OSL-3.0 Open Software License (OSL 3.0)
+ * For the full copyright and license information, please view the
+ * docs/licenses/LICENSE.txt file that was distributed with this source code.
  */
 class WebserviceSpecificManagementImagesCore implements WebserviceSpecificManagementInterface
 {
@@ -76,7 +56,7 @@ class WebserviceSpecificManagementImagesCore implements WebserviceSpecificManage
     ];
 
     /**
-     * @var string The product image declination id
+     * @var string The product image combination id
      */
     protected $productImageDeclinationId = null;
 
@@ -301,7 +281,7 @@ class WebserviceSpecificManagementImagesCore implements WebserviceSpecificManage
             // general images management : like header's logo, invoice logo, etc...
             case 'general':
                 return $this->manageGeneralImages();
-            // normal images management : like the most entity images (categories, manufacturers..)...
+                // normal images management : like the most entity images (categories, manufacturers..)...
             case 'categories':
                 return $this->manageDeclinatedImages(_PS_CAT_IMG_DIR_);
             case 'manufacturers':
@@ -310,12 +290,12 @@ class WebserviceSpecificManagementImagesCore implements WebserviceSpecificManage
                 return $this->manageDeclinatedImages(_PS_SUPP_IMG_DIR_);
             case 'stores':
                 return $this->manageDeclinatedImages(_PS_STORE_IMG_DIR_);
-            // product image management : many image for one entity (product)
+                // product image management : many image for one entity (product)
             case 'products':
                 return $this->manageProductImages();
             case 'customizations':
                 return $this->manageCustomizationImages();
-            // images root node management : many image for one entity (product)
+                // images root node management : many image for one entity (product)
             case '':
                 $this->output .= $this->objOutput->getObjectRender()->renderNodeHeader('image_types', []);
                 foreach (array_keys($this->imageTypes) as $image_type_name) {
@@ -358,7 +338,7 @@ class WebserviceSpecificManagementImagesCore implements WebserviceSpecificManage
 
                 break;
 
-            // Set the image path on display in relation to the mail image
+                // Set the image path on display in relation to the mail image
             case 'mail':
                 if (in_array($this->wsObject->method, ['GET', 'HEAD', 'PUT'])) {
                     $path = _PS_IMG_DIR_ . Configuration::get('PS_LOGO_MAIL');
@@ -369,7 +349,7 @@ class WebserviceSpecificManagementImagesCore implements WebserviceSpecificManage
 
                 break;
 
-            // Set the image path on display in relation to the invoice image
+                // Set the image path on display in relation to the invoice image
             case 'invoice':
                 if (in_array($this->wsObject->method, ['GET', 'HEAD', 'PUT'])) {
                     $path = _PS_IMG_DIR_ . Configuration::get('PS_LOGO_INVOICE');
@@ -380,7 +360,7 @@ class WebserviceSpecificManagementImagesCore implements WebserviceSpecificManage
 
                 break;
 
-            // Set the image path on display in relation to the icon store image
+                // Set the image path on display in relation to the icon store image
             case 'store_icon':
                 if (in_array($this->wsObject->method, ['GET', 'HEAD', 'PUT'])) {
                     $path = _PS_IMG_DIR_ . Configuration::get('PS_STORES_ICON');
@@ -391,7 +371,7 @@ class WebserviceSpecificManagementImagesCore implements WebserviceSpecificManage
 
                 break;
 
-            // List the general image types
+                // List the general image types
             case '':
                 $this->output .= $this->objOutput->getObjectRender()->renderNodeHeader('general_image_types', []);
                 foreach (array_keys($this->imageTypes['general']) as $general_image_type_name) {
@@ -406,7 +386,7 @@ class WebserviceSpecificManagementImagesCore implements WebserviceSpecificManage
 
                 return true;
 
-            // If the image type does not exist...
+                // If the image type does not exist...
             default:
                 $exception = new WebserviceException(sprintf('General image of type "%s" does not exist', $this->wsObject->urlSegment[2]), [53, 400]);
 
@@ -643,7 +623,7 @@ class WebserviceSpecificManagementImagesCore implements WebserviceSpecificManage
             // Match the default images
             case 'default':
                 return $this->manageDefaultDeclinatedImages($directory, $normal_image_sizes);
-            // Display the list of images
+                // Display the list of images
             case '':
                 return $this->manageListDeclinatedImages($directory, $normal_image_sizes);
             default:
@@ -676,7 +656,7 @@ class WebserviceSpecificManagementImagesCore implements WebserviceSpecificManage
 
     protected function manageCustomizationImages()
     {
-        $normal_image_sizes = ImageType::getImagesTypes($this->imageType);
+        $normal_image_sizes = ImageType::getImagesTypes();
         if (empty($this->wsObject->urlSegment[2])) {
             $results = Db::getInstance()->executeS('SELECT DISTINCT `id_cart` FROM `' . _DB_PREFIX_ . 'customization`');
             $ids = [];
@@ -799,7 +779,7 @@ class WebserviceSpecificManagementImagesCore implements WebserviceSpecificManage
                 }
 
                 break;
-            // Modify the image
+                // Modify the image
             case 'PUT':
                 if ($filename_exists) {
                     if ($this->writePostedImageOnDisk($filename, null, null, $image_sizes, $directory)) {
@@ -812,8 +792,8 @@ class WebserviceSpecificManagementImagesCore implements WebserviceSpecificManage
                 } else {
                     throw new WebserviceException('This image does not exist on disk', [63, 500]);
                 }
-            // Delete the image
-            // no break
+                // Delete the image
+                // no break
             case 'DELETE':
                 // Delete products image in DB
                 if ($this->imageType == 'products') {
@@ -832,8 +812,8 @@ class WebserviceSpecificManagementImagesCore implements WebserviceSpecificManage
                 } else {
                     throw new WebserviceException('This image does not exist on disk', [64, 500]);
                 }
-            // Add the image
-            // no break
+                // Add the image
+                // no break
             case 'POST':
                 if ($filename_exists) {
                     throw new WebserviceException('This image already exists. To modify it, please use the PUT method', [65, 400]);
@@ -869,11 +849,11 @@ class WebserviceSpecificManagementImagesCore implements WebserviceSpecificManage
             if ($image_types) {
                 foreach ($image_types as $image_type) {
                     if ($this->defaultImage) { /** @todo products images too !! */
-                        $declination_path = $parent_path . $this->wsObject->urlSegment[3] . '-default-' . $image_type['name'] . '.jpg';
+                        $thumbnail_path = $parent_path . $this->wsObject->urlSegment[3] . '-default-' . $image_type['name'] . '.jpg';
                     } else {
-                        $declination_path = $parent_path . $this->wsObject->urlSegment[2] . '-' . $image_type['name'] . '.jpg';
+                        $thumbnail_path = $parent_path . $this->wsObject->urlSegment[2] . '-' . $image_type['name'] . '.jpg';
                     }
-                    if (!@unlink($declination_path)) {
+                    if (!@unlink($thumbnail_path)) {
                         $this->objOutput->setStatus(204);
 
                         return false;
@@ -938,14 +918,14 @@ class WebserviceSpecificManagementImagesCore implements WebserviceSpecificManage
             $next_width = $source_width;
             $next_height = $source_height;
         } else {
-            if ((int) (Configuration::get('PS_IMAGE_GENERATION_METHOD')) == 2 || ((int) (Configuration::get('PS_IMAGE_GENERATION_METHOD')) == 0 && $width_diff > $height_diff)) {
+            if ((int) Configuration::get('PS_IMAGE_GENERATION_METHOD') == 2 || ((int) Configuration::get('PS_IMAGE_GENERATION_METHOD') == 0 && $width_diff > $height_diff)) {
                 $next_height = $dest_height;
                 $next_width = (int) (($source_width * $next_height) / $source_height);
-                $dest_width = ((int) (Configuration::get('PS_IMAGE_GENERATION_METHOD')) == 0 ? $dest_width : $next_width);
+                $dest_width = ((int) Configuration::get('PS_IMAGE_GENERATION_METHOD') == 0 ? $dest_width : $next_width);
             } else {
                 $next_width = $dest_width;
                 $next_height = (int) ($source_height * $dest_width / $source_width);
-                $dest_height = ((int) (Configuration::get('PS_IMAGE_GENERATION_METHOD')) == 0 ? $dest_height : $next_height);
+                $dest_height = ((int) Configuration::get('PS_IMAGE_GENERATION_METHOD') == 0 ? $dest_height : $next_height);
             }
         }
 
@@ -954,11 +934,11 @@ class WebserviceSpecificManagementImagesCore implements WebserviceSpecificManage
 
         // Build the image
         if (
-            !($dest_image = imagecreatetruecolor($dest_width, $dest_height)) ||
-            !($white = imagecolorallocate($dest_image, 255, 255, 255)) ||
-            !imagefill($dest_image, 0, 0, $white) ||
-            !imagecopyresampled($dest_image, $source_image, $border_width, $border_height, 0, 0, $next_width, $next_height, $source_width, $source_height) ||
-            !imagecolortransparent($dest_image, $white)
+            !($dest_image = imagecreatetruecolor($dest_width, $dest_height))
+            || !($white = imagecolorallocate($dest_image, 255, 255, 255))
+            || !imagefill($dest_image, 0, 0, $white)
+            || !imagecopyresampled($dest_image, $source_image, $border_width, $border_height, 0, 0, $next_width, $next_height, $source_width, $source_height)
+            || !imagecolortransparent($dest_image, $white)
         ) {
             throw new WebserviceException(sprintf('Unable to build the image "%s".', str_replace(_PS_ROOT_DIR_, '[SHOP_ROOT_DIR]', $new_path)), [69, 500]);
         }
@@ -1001,20 +981,20 @@ class WebserviceSpecificManagementImagesCore implements WebserviceSpecificManage
             throw new WebserviceException(sprintf('Unable to write the image "%s".', str_replace(_PS_ROOT_DIR_, '[SHOP_ROOT_DIR]', $new_path)), [70, 500]);
         }
 
-        // Write image declinations if present
+        // Write image thumbnails if present
         if ($image_types) {
             foreach ($image_types as $image_type) {
                 if ($this->defaultImage) {
-                    $declination_path = $parent_path . $this->wsObject->urlSegment[3] . '-default-' . $image_type['name'] . '.jpg';
+                    $thumbnail_path = $parent_path . $this->wsObject->urlSegment[3] . '-default-' . $image_type['name'] . '.jpg';
                 } else {
                     if ($this->imageType == 'products') {
-                        $declination_path = $parent_path . chunk_split($this->wsObject->urlSegment[3], 1, '/') . $this->wsObject->urlSegment[3] . '-' . $image_type['name'] . '.jpg';
+                        $thumbnail_path = $parent_path . chunk_split($this->wsObject->urlSegment[3], 1, '/') . $this->wsObject->urlSegment[3] . '-' . $image_type['name'] . '.jpg';
                     } else {
-                        $declination_path = $parent_path . $this->wsObject->urlSegment[2] . '-' . $image_type['name'] . '.jpg';
+                        $thumbnail_path = $parent_path . $this->wsObject->urlSegment[2] . '-' . $image_type['name'] . '.jpg';
                     }
                 }
-                if (!$this->writeImageOnDisk($base_path, $declination_path, $image_type['width'], $image_type['height'])) {
-                    throw new WebserviceException(sprintf('Unable to save the declination "%s" of this image.', $image_type['name']), [71, 500]);
+                if (!$this->writeImageOnDisk($base_path, $thumbnail_path, $image_type['width'], $image_type['height'])) {
+                    throw new WebserviceException(sprintf('Unable to save the thumbnail "%s" of this image.', $image_type['name']), [71, 500]);
                 }
             }
         }
@@ -1044,7 +1024,7 @@ class WebserviceSpecificManagementImagesCore implements WebserviceSpecificManage
             if (isset($_FILES['image']['tmp_name']) && $_FILES['image']['tmp_name']) {
                 $file = $_FILES['image'];
                 if ($file['size'] > $imgMaxUploadSize) {
-                    throw new WebserviceException(sprintf('The image size is too large (maximum allowed is %d KB)', ($imgMaxUploadSize / 1000)), [72, 400]);
+                    throw new WebserviceException(sprintf('The image size is too large (maximum allowed is %d KB)', $imgMaxUploadSize / 1000), [72, 400]);
                 }
                 // Get mime content type
                 $mime_type = false;
@@ -1091,7 +1071,7 @@ class WebserviceSpecificManagementImagesCore implements WebserviceSpecificManage
             if (isset($_FILES['image']['tmp_name']) && $_FILES['image']['tmp_name']) {
                 $file = $_FILES['image'];
                 if ($file['size'] > $imgMaxUploadSize) {
-                    throw new WebserviceException(sprintf('The image size is too large (maximum allowed is %d KB)', ($imgMaxUploadSize / 1000)), [72, 400]);
+                    throw new WebserviceException(sprintf('The image size is too large (maximum allowed is %d KB)', $imgMaxUploadSize / 1000), [72, 400]);
                 }
                 if ($error = ImageManager::validateUpload($file)) {
                     throw new WebserviceException('Image upload error : ' . $error, [76, 400]);
@@ -1104,7 +1084,7 @@ class WebserviceSpecificManagementImagesCore implements WebserviceSpecificManage
                             throw new WebserviceException('Product ' . (int) $this->wsObject->urlSegment[2] . ' does not exist', [76, 400]);
                         }
                         $image = new Image();
-                        $image->id_product = (int) ($product->id);
+                        $image->id_product = (int) $product->id;
                         $image->position = Image::getHighestPosition($product->id) + 1;
 
                         if (!Image::getCover((int) $product->id)) {

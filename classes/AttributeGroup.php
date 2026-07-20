@@ -1,27 +1,7 @@
 <?php
 /**
- * Copyright since 2007 PrestaShop SA and Contributors
- * PrestaShop is an International Registered Trademark & Property of PrestaShop SA
- *
- * NOTICE OF LICENSE
- *
- * This source file is subject to the Open Software License (OSL 3.0)
- * that is bundled with this package in the file LICENSE.md.
- * It is also available through the world-wide-web at this URL:
- * https://opensource.org/licenses/OSL-3.0
- * If you did not receive a copy of the license and are unable to
- * obtain it through the world-wide-web, please send an email
- * to license@prestashop.com so we can send you a copy immediately.
- *
- * DISCLAIMER
- *
- * Do not edit or add to this file if you wish to upgrade PrestaShop to newer
- * versions in the future. If you wish to customize PrestaShop for your
- * needs please refer to https://devdocs.prestashop.com/ for more information.
- *
- * @author    PrestaShop SA and Contributors <contact@prestashop.com>
- * @copyright Since 2007 PrestaShop SA and Contributors
- * @license   https://opensource.org/licenses/OSL-3.0 Open Software License (OSL 3.0)
+ * For the full copyright and license information, please view the
+ * docs/licenses/LICENSE.txt file that was distributed with this source code.
  */
 
 /**
@@ -49,12 +29,12 @@ class AttributeGroupCore extends ObjectModel
         'multilang' => true,
         'fields' => [
             'is_color_group' => ['type' => self::TYPE_BOOL, 'validate' => 'isBool'],
-            'group_type' => ['type' => self::TYPE_STRING, 'required' => true],
+            'group_type' => ['type' => self::TYPE_STRING, 'required' => true, 'size' => 255, 'trans' => ['key' => 'Attribute type', 'domain' => 'Admin.Catalog.Feature']],
             'position' => ['type' => self::TYPE_INT, 'validate' => 'isInt'],
 
             /* Lang fields */
-            'name' => ['type' => self::TYPE_STRING, 'lang' => true, 'validate' => 'isGenericName', 'required' => true, 'size' => 128],
-            'public_name' => ['type' => self::TYPE_STRING, 'lang' => true, 'validate' => 'isGenericName', 'required' => true, 'size' => 64],
+            'name' => ['type' => self::TYPE_STRING, 'lang' => true, 'validate' => 'isGenericName', 'required' => true, 'size' => 128, 'trans' => ['key' => 'Name', 'domain' => 'Admin.Global']],
+            'public_name' => ['type' => self::TYPE_STRING, 'lang' => true, 'validate' => 'isGenericName', 'required' => true, 'size' => 64, 'trans' => ['key' => 'Public name', 'domain' => 'Admin.Catalog.Feature']],
         ],
     ];
 
@@ -188,11 +168,11 @@ class AttributeGroupCore extends ObjectModel
             if (count($toRemove)) {
                 if (!Db::getInstance()->execute('
 				DELETE FROM `' . _DB_PREFIX_ . 'attribute_lang`
-				WHERE `id_attribute`	IN (' . implode(',', $toRemove) . ')') ||
-                !Db::getInstance()->execute('
+				WHERE `id_attribute`	IN (' . implode(',', $toRemove) . ')')
+                || !Db::getInstance()->execute('
 				DELETE FROM `' . _DB_PREFIX_ . 'attribute_shop`
-				WHERE `id_attribute`	IN (' . implode(',', $toRemove) . ')') ||
-                !Db::getInstance()->execute('DELETE FROM `' . _DB_PREFIX_ . 'attribute` WHERE `id_attribute_group` = ' . (int) $this->id)) {
+				WHERE `id_attribute`	IN (' . implode(',', $toRemove) . ')')
+                || !Db::getInstance()->execute('DELETE FROM `' . _DB_PREFIX_ . 'attribute` WHERE `id_attribute_group` = ' . (int) $this->id)) {
                     return false;
                 }
             }
@@ -261,7 +241,7 @@ class AttributeGroupCore extends ObjectModel
      *
      * @return bool Deletion result
      */
-    public function deleteSelection($selection)
+    public function deleteSelection(array $selection)
     {
         /* Also delete Attributes */
         foreach ($selection as $value) {
@@ -285,7 +265,7 @@ class AttributeGroupCore extends ObjectModel
     {
         $ids = [];
         foreach ($values as $value) {
-            $ids[] = (int) ($value['id']);
+            $ids[] = (int) $value['id'];
         }
         if (!empty($ids)) {
             Db::getInstance()->execute(

@@ -1,27 +1,7 @@
 <?php
 /**
- * Copyright since 2007 PrestaShop SA and Contributors
- * PrestaShop is an International Registered Trademark & Property of PrestaShop SA
- *
- * NOTICE OF LICENSE
- *
- * This source file is subject to the Open Software License (OSL 3.0)
- * that is bundled with this package in the file LICENSE.md.
- * It is also available through the world-wide-web at this URL:
- * https://opensource.org/licenses/OSL-3.0
- * If you did not receive a copy of the license and are unable to
- * obtain it through the world-wide-web, please send an email
- * to license@prestashop.com so we can send you a copy immediately.
- *
- * DISCLAIMER
- *
- * Do not edit or add to this file if you wish to upgrade PrestaShop to newer
- * versions in the future. If you wish to customize PrestaShop for your
- * needs please refer to https://devdocs.prestashop.com/ for more information.
- *
- * @author    PrestaShop SA and Contributors <contact@prestashop.com>
- * @copyright Since 2007 PrestaShop SA and Contributors
- * @license   https://opensource.org/licenses/OSL-3.0 Open Software License (OSL 3.0)
+ * For the full copyright and license information, please view the
+ * docs/licenses/LICENSE.txt file that was distributed with this source code.
  */
 
 namespace PrestaShop\PrestaShop\Adapter\Order\QueryHandler;
@@ -50,6 +30,7 @@ use PrestaShop\PrestaShop\Adapter\Configuration;
 use PrestaShop\PrestaShop\Adapter\Customer\CustomerDataProvider;
 use PrestaShop\PrestaShop\Adapter\Order\AbstractOrderHandler;
 use PrestaShop\PrestaShop\Core\Address\AddressFormatterInterface;
+use PrestaShop\PrestaShop\Core\CommandBus\Attributes\AsQueryHandler;
 use PrestaShop\PrestaShop\Core\Domain\Address\ValueObject\AddressId;
 use PrestaShop\PrestaShop\Core\Domain\Exception\InvalidSortingException;
 use PrestaShop\PrestaShop\Core\Domain\Order\Exception\OrderException;
@@ -97,6 +78,7 @@ use Validate;
  *
  * @internal
  */
+#[AsQueryHandler]
 final class GetOrderForViewingHandler extends AbstractOrderHandler implements GetOrderForViewingHandlerInterface
 {
     /**
@@ -155,7 +137,7 @@ final class GetOrderForViewingHandler extends AbstractOrderHandler implements Ge
         CustomerDataProvider $customerDataProvider,
         GetOrderProductsForViewingHandlerInterface $getOrderProductsForViewingHandler,
         Configuration $configuration,
-        AddressFormatterInterface $addressFormatter = null
+        ?AddressFormatterInterface $addressFormatter = null
     ) {
         $this->translator = $translator;
         $this->contextLanguageId = $contextLanguageId;
@@ -224,7 +206,10 @@ final class GetOrderForViewingHandler extends AbstractOrderHandler implements Ge
             $this->getLinkedOrders($order),
             $this->addressFormatter->format(new AddressId((int) $order->id_address_delivery)),
             $this->addressFormatter->format(new AddressId((int) $order->id_address_invoice)),
-            (string) $order->note
+            (string) $order->note,
+            (string) $order->payment,
+            (string) $order->module,
+            (int) $order->id_cart
         );
     }
 
@@ -238,7 +223,7 @@ final class GetOrderForViewingHandler extends AbstractOrderHandler implements Ge
         $currency = new Currency($order->id_currency);
         $customer = new Customer($order->id_customer);
         $genderName = '';
-        $totalSpentSinceRegistration = null;
+        $totalSpentSinceRegistration = 0;
 
         if (!Validate::isLoadedObject($customer)) {
             $customer = $this->buildFakeCustomerObject($order, $invoiceAddress);
@@ -285,7 +270,7 @@ final class GetOrderForViewingHandler extends AbstractOrderHandler implements Ge
             $genderName,
             $customer->email,
             new DateTimeImmutable($customer->date_add ?? 'now'),
-            $totalSpentSinceRegistration !== null ? $this->locale->formatPrice($totalSpentSinceRegistration, $currency->iso_code) : '',
+            $this->locale->formatPrice((float) $totalSpentSinceRegistration, $currency->iso_code),
             $customerStats['nb_orders'],
             $customer->note,
             (bool) $customer->is_guest,
@@ -390,7 +375,8 @@ final class GetOrderForViewingHandler extends AbstractOrderHandler implements Ge
                 new DateTimeImmutable($item['date_add']),
                 (bool) $item['send_email'],
                 $item['employee_firstname'],
-                $item['employee_lastname']
+                $item['employee_lastname'],
+                $item['api_client_id'],
             );
         }
 
@@ -499,9 +485,9 @@ final class GetOrderForViewingHandler extends AbstractOrderHandler implements Ge
             );
         }
 
-        $canGenerateInvoice = $this->configuration->get('PS_INVOICE') &&
-            count($order->getInvoicesCollection()) &&
-            $order->invoice_number;
+        $canGenerateInvoice = $this->configuration->get('PS_INVOICE')
+            && count($order->getInvoicesCollection())
+            && $order->invoice_number;
 
         $canGenerateDeliverySlip = (bool) $order->delivery_number;
 
@@ -542,9 +528,13 @@ final class GetOrderForViewingHandler extends AbstractOrderHandler implements Ge
         if (!$order->isVirtual()) {
             foreach ($shipping as $item) {
                 if ($taxCalculationMethod == PS_TAX_INC) {
-                    $price = Tools::displayPrice($item['shipping_cost_tax_incl'], $currency);
+                    $price = $item['shipping_cost_tax_incl']
+                        ? $this->locale->formatPrice($item['shipping_cost_tax_incl'], $currency->iso_code)
+                        : $item['shipping_cost_tax_incl'];
                 } else {
-                    $price = Tools::displayPrice($item['shipping_cost_tax_excl'], $currency);
+                    $price = $item['shipping_cost_tax_excl']
+                        ? $this->locale->formatPrice($item['shipping_cost_tax_excl'], $currency->iso_code)
+                        : $item['shipping_cost_tax_excl'];
                 }
 
                 $trackingUrl = null;
@@ -697,11 +687,11 @@ final class GetOrderForViewingHandler extends AbstractOrderHandler implements Ge
 
         foreach ($orderMessagesForOrderPage['messages'] as $orderMessage) {
             $messageEmployeeId = (int) $orderMessage['id_employee'];
-            $isCurrentEmployeesMessage = (int) $this->context->employee->id === $messageEmployeeId;
+            $isCurrentEmployeesMessage = $this->context->employee && ((int) $this->context->employee->id === $messageEmployeeId);
 
             $messages[] = new OrderMessageForViewing(
                 (int) $orderMessage['id_customer_message'],
-                $orderMessage['message'],
+                (string) $orderMessage['message'],
                 new OrderMessageDateForViewing(
                     new DateTimeImmutable($orderMessage['date_add']),
                     $this->context->language->date_format_full
@@ -767,13 +757,13 @@ final class GetOrderForViewingHandler extends AbstractOrderHandler implements Ge
             new DecimalNumber((string) $shippingRefundable),
             new DecimalNumber((string) $taxesAmount),
             new DecimalNumber((string) $totalAmount),
-            Tools::displayPrice($productsPrice, $currency),
-            Tools::displayPrice($discountsAmount, $currency),
-            Tools::displayPrice($wrappingPrice, $currency),
-            Tools::displayPrice($shippingPrice, $currency),
-            Tools::displayPrice($shippingRefundable, $currency),
-            Tools::displayPrice($taxesAmount, $currency),
-            Tools::displayPrice($totalAmount, $currency)
+            $this->locale->formatPrice($productsPrice, $currency->iso_code),
+            $this->locale->formatPrice($discountsAmount, $currency->iso_code),
+            $this->locale->formatPrice($wrappingPrice, $currency->iso_code),
+            $this->locale->formatPrice($shippingPrice, $currency->iso_code),
+            $this->locale->formatPrice($shippingRefundable, $currency->iso_code),
+            $this->locale->formatPrice($taxesAmount, $currency->iso_code),
+            $this->locale->formatPrice($totalAmount, $currency->iso_code)
         );
     }
 
@@ -797,7 +787,7 @@ final class GetOrderForViewingHandler extends AbstractOrderHandler implements Ge
                 (int) $discount['id_order_cart_rule'],
                 $discount['name'],
                 new DecimalNumber((string) $discountAmount),
-                Tools::displayPrice($discountAmount, $currency)
+                $this->locale->formatPrice($discountAmount, $currency->iso_code)
             );
         }
 

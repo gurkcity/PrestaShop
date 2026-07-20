@@ -1,27 +1,7 @@
 <?php
 /**
- * Copyright since 2007 PrestaShop SA and Contributors
- * PrestaShop is an International Registered Trademark & Property of PrestaShop SA
- *
- * NOTICE OF LICENSE
- *
- * This source file is subject to the Open Software License (OSL 3.0)
- * that is bundled with this package in the file LICENSE.md.
- * It is also available through the world-wide-web at this URL:
- * https://opensource.org/licenses/OSL-3.0
- * If you did not receive a copy of the license and are unable to
- * obtain it through the world-wide-web, please send an email
- * to license@prestashop.com so we can send you a copy immediately.
- *
- * DISCLAIMER
- *
- * Do not edit or add to this file if you wish to upgrade PrestaShop to newer
- * versions in the future. If you wish to customize PrestaShop for your
- * needs please refer to https://devdocs.prestashop.com/ for more information.
- *
- * @author    PrestaShop SA and Contributors <contact@prestashop.com>
- * @copyright Since 2007 PrestaShop SA and Contributors
- * @license   https://opensource.org/licenses/OSL-3.0 Open Software License (OSL 3.0)
+ * For the full copyright and license information, please view the
+ * docs/licenses/LICENSE.txt file that was distributed with this source code.
  */
 
 declare(strict_types=1);
@@ -67,7 +47,7 @@ class CountryGridDefinitionFactory extends AbstractGridDefinitionFactory
      */
     protected function getName(): string
     {
-        return $this->trans('Country', [], 'Admin.Global');
+        return $this->trans('Countries', [], 'Admin.Global');
     }
 
     /**
@@ -117,7 +97,7 @@ class CountryGridDefinitionFactory extends AbstractGridDefinitionFactory
                         'field' => 'zone_name',
                     ])
             )
-            //todo: change it to ToggleColumn when toggle status route is created
+            // todo: change it to ToggleColumn when toggle status route is created
             ->add(
                 (new DataColumn('active'))
                     ->setName($this->trans('Enabled', [], 'Admin.Global'))
@@ -228,6 +208,13 @@ class CountryGridDefinitionFactory extends AbstractGridDefinitionFactory
                         'route_param_field' => 'id_country',
                         'clickable_row' => true,
                     ])
+            )
+            ->add(
+                $this->buildDeleteAction(
+                    'admin_countries_delete',
+                    'countryId',
+                    'id_country'
+                )
             );
 
         return $rowActionCollection;
@@ -261,7 +248,7 @@ class CountryGridDefinitionFactory extends AbstractGridDefinitionFactory
      */
     protected function getBulkActions(): BulkActionCollectionInterface
     {
-        //todo: need to implement bulk actions
+        // todo: need to implement bulk actions
         return new BulkActionCollection();
     }
 }

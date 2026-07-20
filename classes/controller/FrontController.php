@@ -1,28 +1,8 @@
 <?php
 
 /**
- * Copyright since 2007 PrestaShop SA and Contributors
- * PrestaShop is an International Registered Trademark & Property of PrestaShop SA
- *
- * NOTICE OF LICENSE
- *
- * This source file is subject to the Open Software License (OSL 3.0)
- * that is bundled with this package in the file LICENSE.md.
- * It is also available through the world-wide-web at this URL:
- * https://opensource.org/licenses/OSL-3.0
- * If you did not receive a copy of the license and are unable to
- * obtain it through the world-wide-web, please send an email
- * to license@prestashop.com so we can send you a copy immediately.
- *
- * DISCLAIMER
- *
- * Do not edit or add to this file if you wish to upgrade PrestaShop to newer
- * versions in the future. If you wish to customize PrestaShop for your
- * needs please refer to https://devdocs.prestashop.com/ for more information.
- *
- * @author    PrestaShop SA and Contributors <contact@prestashop.com>
- * @copyright Since 2007 PrestaShop SA and Contributors
- * @license   https://opensource.org/licenses/OSL-3.0 Open Software License (OSL 3.0)
+ * For the full copyright and license information, please view the
+ * docs/licenses/LICENSE.txt file that was distributed with this source code.
  */
 
 use PrestaShop\PrestaShop\Adapter\Configuration as ConfigurationAdapter;
@@ -30,7 +10,9 @@ use PrestaShop\PrestaShop\Adapter\ContainerBuilder;
 use PrestaShop\PrestaShop\Adapter\Image\ImageRetriever;
 use PrestaShop\PrestaShop\Adapter\Presenter\Cart\CartPresenter;
 use PrestaShop\PrestaShop\Adapter\Presenter\Object\ObjectPresenter;
+use PrestaShop\PrestaShop\Adapter\SymfonyContainer;
 use PrestaShop\PrestaShop\Core\Security\PasswordPolicyConfiguration;
+use Symfony\Component\DependencyInjection\ContainerInterface;
 use Symfony\Component\Filesystem\Filesystem;
 use Symfony\Component\HttpFoundation\IpUtils;
 
@@ -48,46 +30,8 @@ class FrontControllerCore extends Controller
     /** @var string Language ISO code */
     public $iso;
 
-    /**
-     * @deprecated Since 8.0 and will be removed in the next major.
-     *
-     * @var string ORDER BY field
-     */
-    public $orderBy;
-
-    /**
-     * @deprecated Since 8.0 and will be removed in the next major.
-     *
-     * @var string Order way string ('ASC', 'DESC')
-     */
-    public $orderWay;
-
-    /**
-     * @deprecated Since 8.0 and will be removed in the next major.
-     *
-     * @var int Current page number
-     */
-    public $p;
-
-    /**
-     * @deprecated Since 8.0 and will be removed in the next major.
-     *
-     * @var int Items (products) per page
-     */
-    public $n;
-
     /** @var bool If set to true, will redirected user to login page during init function. */
     public $auth = false;
-
-    /**
-     * If set to true, user can be logged in as guest when checking if logged in.
-     *
-     * @deprecated Since 8.0 and will be removed in the next major.
-     * @see $auth
-     *
-     * @var bool
-     */
-    public $guestAllowed = false;
 
     /**
      * Route of PrestaShop page to redirect to after forced login.
@@ -122,13 +66,6 @@ class FrontControllerCore extends Controller
      * @var array Holds current customer's groups
      */
     protected static $currentCustomerGroups;
-
-    /**
-     * @deprecated Since 8.0 and will be removed in the next major.
-     *
-     * @var int
-     */
-    public $nb_items_per_page;
 
     /**
      * @var ObjectPresenter
@@ -197,7 +134,7 @@ class FrontControllerCore extends Controller
 
         parent::__construct();
 
-        if (Configuration::get('PS_SSL_ENABLED') && Configuration::get('PS_SSL_ENABLED_EVERYWHERE')) {
+        if (Configuration::get('PS_SSL_ENABLED')) {
             $this->ssl = true;
         }
 
@@ -241,6 +178,7 @@ class FrontControllerCore extends Controller
 
     /**
      * Check if the current user/visitor has valid view permissions.
+     * Currently not used in any native controller.
      *
      * @see Controller::viewAccess
      *
@@ -267,6 +205,7 @@ class FrontControllerCore extends Controller
                 'controller' => $this,
             ]
         );
+        Hook::exec('action' . $this->getControllerName() . 'InitBefore', ['controller' => $this]);
 
         /*
          * Globals are DEPRECATED as of version 1.5.0.1
@@ -298,11 +237,6 @@ class FrontControllerCore extends Controller
             $this->display_footer = false;
         }
 
-        // If account created with the 2 steps register process, remove 'account_created' from cookie
-        if (isset($this->context->cookie->account_created)) {
-            unset($this->context->cookie->account_created);
-        }
-
         ob_start();
 
         // Initialize URL provider in context, depending on SSL mode
@@ -318,14 +252,32 @@ class FrontControllerCore extends Controller
 
         // Redirect user to login page, if the controller requires authentication
         if ($this->auth && !$this->context->customer->isLogged()) {
-            Tools::redirect('index.php?controller=authentication' . ($this->authRedirection ? '&back=' . $this->authRedirection : ''));
+            Tools::redirect($this->context->link->getPageLink(
+                'authentication',
+                null,
+                null,
+                $this->authRedirection ? ['back' => $this->authRedirection] : null
+            ));
         }
 
         // If the theme is missing, we need to throw an Exception
         if (!is_dir(_PS_THEME_DIR_)) {
-            throw new PrestaShopException($this->trans('Current theme is unavailable. Please check your theme\'s directory name ("%s") and permissions.', [basename(rtrim(_PS_THEME_DIR_, '/\\'))], 'Admin.Design.Notification'));
+            throw new PrestaShopException($this->trans('Current theme is unavailable. Please check your theme\'s directory name ("%s") and permissions.', [htmlspecialchars(basename(rtrim(_PS_THEME_DIR_, '/\\')))], 'Admin.Design.Notification'));
         }
 
+        /*
+         * The default country is already set in config.inc.php before loading the front controller. This country will be used
+         * to display prices, taxes, delivery options and other country specific data.
+         *
+         * Here, the country can get modified based on geolocation or browser's preferred country.
+         *
+         * The country may also be changed further down in this method, if we have a cart with an address assigned to it.
+         * If there is a cart already, the context country is set to the country of that cart.
+         *
+         * If you are looking to override the country selection logic, you can use actionFrontControllerInitBefore above
+         * and pre-set the things in beforehand or actionFrontControllerInitContextCountryAfter below, if you want to use the built
+         * in geolocation logic and just modify the result.
+         */
         if (Configuration::get('PS_GEOLOCATION_ENABLED')) {
             if (($new_default = $this->geolocationManagement($this->context->country)) && Validate::isLoadedObject($new_default)) {
                 $this->context->country = $new_default;
@@ -351,7 +303,7 @@ class FrontControllerCore extends Controller
                     $id_country = Tools::getCountry();
                 }
 
-                $country = new Country($id_country, (int) $this->context->cookie->id_lang);
+                $country = new Country($id_country, (int) $this->context->language->id);
 
                 if (!$has_currency && Validate::isLoadedObject($country) && $this->context->country->id !== $country->id) {
                     $this->context->country = $country;
@@ -362,13 +314,34 @@ class FrontControllerCore extends Controller
         }
 
         /*
+         * Allow modules to override the country selection logic after running geolocation, if needed. Just do whatever you need
+         * and assign proper country to context->country.
+         */
+        Hook::exec(
+            'actionFrontControllerDetectContextCountryAfter',
+            [
+                'controller' => $this,
+            ]
+        );
+
+        /*
          * Get proper currency from the cookie and $_GET parameters. It will provide us with a requested currency
          * or a default currency, if the requested one is not valid anymore.
+         * Assign that currency to the context, so we can immediately use it for calculations.
          */
-        $currency = Tools::setCurrency($this->context->cookie);
+        $this->context->currency = Tools::setCurrency($this->context->cookie);
 
-        // Assign that currency to the context, so we can immediately use it for calculations.
-        $this->context->currency = $currency;
+        /*
+         * Allow modules to override the currency selection logic if needed. Just do whatever you need
+         * and assign proper currency to context->currency and context->cookie->id_currency. Useful if you want
+         * to implement custom currency selection logic, for example always force a currency based on country.
+         */
+        Hook::exec(
+            'actionFrontControllerInitContextCurrencyAfter',
+            [
+                'controller' => $this,
+            ]
+        );
 
         if (isset($_GET['logout']) || ($this->context->customer->logged && Customer::isBanned($this->context->customer->id))) {
             $this->context->customer->logout();
@@ -401,10 +374,10 @@ class FrontControllerCore extends Controller
              * If geolocation is enabled and we are not allowed to order from our country, we will delete the cart.
              */
             } elseif (
-                (int) (Configuration::get('PS_GEOLOCATION_ENABLED'))
+                (int) Configuration::get('PS_GEOLOCATION_ENABLED')
                 && !in_array(strtoupper($this->context->cookie->iso_code_country), explode(';', Configuration::get('PS_ALLOWED_COUNTRIES')))
                 && $cart->nbProducts()
-                && (int) (Configuration::get('PS_GEOLOCATION_NA_BEHAVIOR')) != -1
+                && (int) Configuration::get('PS_GEOLOCATION_NA_BEHAVIOR') != -1
                 && !FrontController::isInWhitelistForGeolocation()
                 && !in_array($_SERVER['SERVER_NAME'], ['localhost', '127.0.0.1', '::1'])
             ) {
@@ -418,15 +391,16 @@ class FrontControllerCore extends Controller
              */
             } elseif (
                 $this->context->cookie->id_customer != $cart->id_customer
-                || $this->context->cookie->id_lang != $cart->id_lang
-                || $currency->id != $cart->id_currency
+                || $this->context->language->id != $cart->id_lang
+                || $this->context->currency->id != $cart->id_currency
             ) {
                 // update cart values
                 if ($this->context->cookie->id_customer) {
                     $cart->id_customer = (int) $this->context->cookie->id_customer;
                 }
-                $cart->id_lang = (int) $this->context->cookie->id_lang;
-                $cart->id_currency = (int) $currency->id;
+                $cart->id_lang = (int) $this->context->language->id;
+                $cart->id_currency = (int) $this->context->currency->id;
+                $this->context->cart = $cart;
                 $cart->update();
             }
 
@@ -465,8 +439,8 @@ class FrontControllerCore extends Controller
          */
         if (!isset($cart) || !$cart->id) {
             $cart = new Cart();
-            $cart->id_lang = (int) $this->context->cookie->id_lang;
-            $cart->id_currency = (int) $this->context->cookie->id_currency;
+            $cart->id_lang = (int) $this->context->language->id;
+            $cart->id_currency = (int) $this->context->currency->id;
             $cart->id_guest = (int) $this->context->cookie->id_guest;
             $cart->id_shop_group = (int) $this->context->shop->id_shop_group;
             $cart->id_shop = $this->context->shop->id;
@@ -501,10 +475,13 @@ class FrontControllerCore extends Controller
 
         Product::initPricesComputation();
 
+        /*
+         * If there is an address assigned to the cart in context, the context->country MUST be set to the country of that address.
+         * We use delivery or invoice address, depending on PS_TAX_ADDRESS_TYPE configuration.
+         */
         if (isset($cart->{Configuration::get('PS_TAX_ADDRESS_TYPE')}) && $cart->{Configuration::get('PS_TAX_ADDRESS_TYPE')}) {
             $infos = Address::getCountryAndState((int) $cart->{Configuration::get('PS_TAX_ADDRESS_TYPE')});
-            $country = new Country((int) $infos['id_country']);
-            $this->context->country = $country;
+            $this->context->country = new Country((int) $infos['id_country']);
         }
 
         if (!Tools::isPHPCLI()) {
@@ -521,6 +498,7 @@ class FrontControllerCore extends Controller
                 'controller' => $this,
             ]
         );
+        Hook::exec('action' . $this->getControllerName() . 'InitAfter', ['controller' => $this]);
     }
 
     /**
@@ -533,16 +511,32 @@ class FrontControllerCore extends Controller
     {
     }
 
+    /**
+     * Initializes a set of commonly used variables, available for use in the template.
+     *
+     * @throws PrestaShopException
+     */
     protected function assignGeneralPurposeVariables()
     {
-        if (Validate::isLoadedObject($this->context->cart)) {
-            $cart = $this->context->cart;
-        } else {
-            $cart = new Cart();
-        }
+        $templateVars = [];
+        $cart = $this->context->cart;
+
+        Hook::exec(
+            'actionFrontControllerSetVariablesBefore',
+            [
+                'templateVars' => &$templateVars,
+                'cart' => $cart,
+            ]
+        );
+        Hook::exec('action' . $this->getControllerName() . 'SetVariablesBefore',
+            [
+                'templateVars' => &$templateVars,
+                'cart' => $cart,
+            ]
+        );
 
         $templateVars = [
-            'cart' => $this->cart_presenter->present($cart),
+            'cart' => $this->cart_presenter->present($cart, true),
             'currency' => $this->getTemplateVarCurrency(),
             'customer' => $this->getTemplateVarCustomer(),
             'country' => $this->objectPresenter->present($this->context->country),
@@ -570,6 +564,16 @@ class FrontControllerCore extends Controller
             null,
             true
         );
+        $modulesVariables = array_merge(
+            $modulesVariables,
+            Hook::exec('action' . $this->getControllerName() . 'SetVariables',
+                [
+                    'templateVars' => &$templateVars,
+                ],
+                null,
+                true
+            )
+        );
 
         if (is_array($modulesVariables)) {
             foreach ($modulesVariables as $moduleName => $variables) {
@@ -591,7 +595,7 @@ class FrontControllerCore extends Controller
      *
      * @return array Variables to be inserted in the "prestashop" javascript object
      *
-     * @throws \PrestaShop\PrestaShop\Core\Filter\FilterException
+     * @throws PrestaShop\PrestaShop\Core\Filter\FilterException
      * @throws PrestaShopException
      */
     protected function buildFrontEndObject($object)
@@ -602,24 +606,26 @@ class FrontControllerCore extends Controller
         Hook::exec('actionBuildFrontEndObject', [
             'obj' => &$object,
         ]);
+        Hook::exec('actionBuild' . $this->getControllerName() . 'FrontEndObject', [
+            'obj' => &$object,
+        ]);
 
         return $object;
     }
 
     /**
      * Initializes common front page content: header, footer and side columns.
+     *
+     * @throws PrestaShopException
      */
     public function initContent()
     {
         $this->assignGeneralPurposeVariables();
         $this->process();
 
-        if (!isset($this->context->cart)) {
-            $this->context->cart = new Cart();
-        }
-
         $this->context->smarty->assign([
-            'HOOK_HEADER' => Hook::exec('displayHeader'),
+            'HOOK_HEADER' => Hook::exec('displayHeader')
+                . Hook::exec('display' . $this->getControllerName() . 'Header'),
         ]);
     }
 
@@ -646,7 +652,7 @@ class FrontControllerCore extends Controller
 
     /**
      * Called before compiling common page sections (header, footer, columns).
-     * Good place to modify smarty variables.
+     * Good place to modify smarty variables. Currently not used by any native controller.
      *
      * @see FrontController::initContent()
      */
@@ -724,7 +730,7 @@ class FrontControllerCore extends Controller
     /**
      * Compiles and outputs full page content.
      *
-     * @return bool
+     * @return void
      *
      * @throws Exception
      * @throws SmartyException
@@ -740,8 +746,6 @@ class FrontControllerCore extends Controller
         ]);
 
         $this->smartyOutputContent($this->template);
-
-        return true;
     }
 
     protected function smartyOutputContent($content)
@@ -761,6 +765,7 @@ class FrontControllerCore extends Controller
         }
 
         Hook::exec('actionOutputHTMLBefore', ['html' => &$html]);
+        Hook::exec('actionOutput' . $this->getControllerName() . 'HTMLBefore', ['html' => &$html]);
         echo trim($html);
     }
 
@@ -796,9 +801,7 @@ class FrontControllerCore extends Controller
         if ($this->maintenance == true || !(int) Configuration::get('PS_SHOP_ENABLE')) {
             $this->maintenance = true;
 
-            $is_admin = (int) (new Cookie('psAdmin'))->id_employee;
-            $maintenance_allow_admins = (bool) Configuration::get('PS_MAINTENANCE_ALLOW_ADMINS');
-            if ($is_admin && $maintenance_allow_admins) {
+            if (Tools::isAllowedToBypassMaintenance()) {
                 return;
             }
 
@@ -807,11 +810,12 @@ class FrontControllerCore extends Controller
                 header('HTTP/1.1 503 Service Unavailable');
                 header('Retry-After: 3600');
 
+                $this->setMedia();
                 $this->registerStylesheet('theme-error', '/assets/css/error.css', ['media' => 'all', 'priority' => 50]);
                 $this->context->smarty->assign([
                     'urls' => $this->getTemplateVarUrls(),
                     'shop' => $this->getTemplateVarShop(),
-                    'HOOK_MAINTENANCE' => Hook::exec('displayMaintenance', []),
+                    'HOOK_MAINTENANCE' => Hook::exec('displayMaintenance'),
                     'maintenance_text' => Configuration::get('PS_MAINTENANCE_TEXT', (int) $this->context->language->id),
                     'stylesheets' => $this->getStylesheets(),
                 ]);
@@ -855,7 +859,7 @@ class FrontControllerCore extends Controller
             } else {
                 header('Location: ' . Tools::getShopDomain(true) . $_SERVER['REQUEST_URI']);
             }
-            exit();
+            exit;
         }
     }
 
@@ -864,7 +868,7 @@ class FrontControllerCore extends Controller
      *
      * @param string $canonical_url
      */
-    protected function canonicalRedirection($canonical_url = '')
+    protected function canonicalRedirection(string $canonical_url = '')
     {
         if (!$canonical_url || !Configuration::get('PS_CANONICAL_REDIRECT') || strtoupper($_SERVER['REQUEST_METHOD']) != 'GET') {
             return;
@@ -906,7 +910,7 @@ class FrontControllerCore extends Controller
 
                     try {
                         $record = $reader->city(Tools::getRemoteAddr());
-                    } catch (\GeoIp2\Exception\AddressNotFoundException $e) {
+                    } catch (GeoIp2\Exception\AddressNotFoundException $e) {
                         $record = null;
                     }
 
@@ -916,7 +920,7 @@ class FrontControllerCore extends Controller
                                 $this->restrictedCountry = Country::GEOLOC_FORBIDDEN;
                             } elseif (Configuration::get('PS_GEOLOCATION_BEHAVIOR') == _PS_GEOLOCATION_NO_ORDER_) {
                                 $this->restrictedCountry = Country::GEOLOC_CATALOG_MODE;
-                                $this->warning[] = $this->trans('You cannot place a new order from your country (%s).', [$record->country->name], 'Shop.Notifications.Warning');
+                                $this->warning[] = $this->trans('You cannot place a new order from your country (%s).', [htmlspecialchars($record->country->name)], 'Shop.Notifications.Warning');
                             }
                         } else {
                             $hasBeenSet = !isset($this->context->cookie->iso_code_country);
@@ -949,7 +953,7 @@ class FrontControllerCore extends Controller
                     }
                     $this->warning[] = $this->trans(
                         'You cannot place a new order from your country (%s).',
-                        [$countryName],
+                        [htmlspecialchars($countryName)],
                         'Shop.Notifications.Warning'
                     );
                 }
@@ -963,6 +967,8 @@ class FrontControllerCore extends Controller
      * Sets controller CSS and JS files.
      *
      * @return bool
+     *
+     * @throws PrestaShopException
      */
     public function setMedia()
     {
@@ -990,7 +996,8 @@ class FrontControllerCore extends Controller
         }
 
         // Execute Hook FrontController SetMedia
-        Hook::exec('actionFrontControllerSetMedia', []);
+        Hook::exec('actionFrontControllerSetMedia');
+        Hook::exec('action' . $this->getControllerName() . 'SetMedia');
 
         return true;
     }
@@ -1068,8 +1075,6 @@ class FrontControllerCore extends Controller
 
     /**
      * Checks if token is valid.
-     *
-     * @since 1.5.0.1
      *
      * @return bool
      */
@@ -1234,13 +1239,32 @@ class FrontControllerCore extends Controller
      */
     public function addJqueryUI($component, $theme = 'base', $check_dependencies = true)
     {
-        $css_theme_path = '/js/jquery/ui/themes/' . $theme . '/minified/jquery.ui.theme.min.css';
-        $css_path = '/js/jquery/ui/themes/' . $theme . '/minified/jquery-ui.min.css';
-        $js_path = '/js/jquery/ui/jquery-ui.min.js';
+        if (!is_array($component)) {
+            $component = [$component];
+        }
 
-        $this->registerStylesheet('jquery-ui-theme', $css_theme_path, ['media' => 'all', 'priority' => 95]);
-        $this->registerStylesheet('jquery-ui', $css_path, ['media' => 'all', 'priority' => 90]);
-        $this->registerJavascript('jquery-ui', $js_path, ['position' => 'bottom', 'priority' => 49]);
+        foreach ($component as $ui) {
+            // If the component does not start with ui. prefix, we need to add it
+            if (!str_starts_with($ui, 'ui.')) {
+                $ui = 'ui.' . $ui;
+            }
+
+            $ui_path = Media::getJqueryUIPath($ui, $theme, $check_dependencies);
+            foreach ($ui_path['css'] as $uiPathCss => $uiMediaCss) {
+                $this->registerStylesheet(
+                    str_replace(_PS_JS_DIR_ . 'jquery/ui/themes/' . $theme . '/', '', $uiPathCss),
+                    str_replace(_PS_JS_DIR_, '/js/', $uiPathCss),
+                    ['media' => $uiMediaCss, 'priority' => 95]
+                );
+            }
+            foreach ($ui_path['js'] as $uiPathJs) {
+                $this->registerJavascript(
+                    str_replace(_PS_JS_DIR_ . 'jquery/ui/', '', $uiPathJs),
+                    str_replace(_PS_JS_DIR_, '/js/', $uiPathJs),
+                    ['position' => 'bottom', 'priority' => 49]
+                );
+            }
+        }
     }
 
     /**
@@ -1332,19 +1356,11 @@ class FrontControllerCore extends Controller
             return false;
         }
 
-        // Initialize this data into cookie, FrontController will use it later
-        $customer->logged = true;
-        $this->context->customer = $customer;
-        $this->context->cookie->id_customer = (int) $customer->id;
-        $this->context->cookie->customer_lastname = $customer->lastname;
-        $this->context->cookie->customer_firstname = $customer->firstname;
-        $this->context->cookie->logged = true;
         $this->context->cookie->check_cgv = 1;
-        $this->context->cookie->is_guest = $customer->isGuest();
-        $this->context->cookie->passwd = $customer->passwd;
-        $this->context->cookie->email = $customer->email;
-        $this->context->cookie->id_guest = (int) $cart->id_guest;
         $this->context->cookie->id_cart = $id_cart;
+
+        // Restore customer session and authentication state (cookie + CustomerSession)
+        $this->context->updateCustomer($customer);
 
         // Return the value for backward compatibility
         return $id_cart;
@@ -1363,17 +1379,7 @@ class FrontControllerCore extends Controller
     }
 
     /**
-     * Removed in PrestaShop 1.7.
-     *
-     * @return bool
-     */
-    protected function useMobileTheme()
-    {
-        return false;
-    }
-
-    /**
-     * Returns theme directory (regular or mobile).
+     * Returns theme directory
      *
      * @return string
      */
@@ -1390,8 +1396,6 @@ class FrontControllerCore extends Controller
      * - /themes/default/override/layout-product-1.tpl
      * - /themes/default/override/layout-product.tpl
      * - /themes/default/layout.tpl.
-     *
-     * @since 1.5.0.13
      *
      * @return bool|string
      */
@@ -1489,59 +1493,11 @@ class FrontControllerCore extends Controller
     }
 
     /**
-     * Renders and adds color list HTML for each product in a list.
+     * Initializes a set of commonly used urls of pages, image folders and others, available for use
+     * in the template. @see FrontController::assignGeneralPurposeVariables for more information.
      *
-     * @deprecated since 8.1 and will be removed in next major version.
-     *
-     * @param array $products
+     * @return array
      */
-    public function addColorsToProductList(&$products)
-    {
-        if (!is_array($products) || !count($products) || !file_exists(_PS_THEME_DIR_ . 'product-list-colors.tpl')) {
-            return;
-        }
-
-        $products_need_cache = [];
-        foreach ($products as $product) {
-            if (!$this->isCached(_PS_THEME_DIR_ . 'product-list-colors.tpl', $this->getColorsListCacheId($product['id_product']))) {
-                $products_need_cache[] = (int) $product['id_product'];
-            }
-        }
-
-        $colors = false;
-        if (count($products_need_cache)) {
-            $colors = Product::getAttributesColorList($products_need_cache);
-        }
-
-        Tools::enableCache();
-        foreach ($products as &$product) {
-            $tpl = $this->context->smarty->createTemplate(_PS_THEME_DIR_ . 'product-list-colors.tpl', $this->getColorsListCacheId($product['id_product']));
-            $tpl->assign([
-                'id_product' => $product['id_product'],
-                'colors_list' => isset($colors[$product['id_product']]) ? $colors[$product['id_product']] : null,
-                'link' => Context::getContext()->link,
-                'img_col_dir' => _THEME_COL_DIR_,
-                'col_img_dir' => _PS_COL_IMG_DIR_,
-            ]);
-            $product['color_list'] = $tpl->fetch(_PS_THEME_DIR_ . 'product-list-colors.tpl', $this->getColorsListCacheId($product['id_product']));
-        }
-        Tools::restoreCacheSettings();
-    }
-
-    /**
-     * Returns cache ID for product color list.
-     *
-     * @deprecated since 8.1 and will be removed in next major version.
-     *
-     * @param int $id_product
-     *
-     * @return string
-     */
-    protected function getColorsListCacheId($id_product)
-    {
-        return Product::getColorsListCacheId($id_product);
-    }
-
     public function getTemplateVarUrls()
     {
         if ($this->urls === null) {
@@ -1621,6 +1577,12 @@ class FrontControllerCore extends Controller
         return $this->urls;
     }
 
+    /**
+     * Initializes a set of commonly used variables of current configuration, available for use
+     * in the template. @see FrontController::assignGeneralPurposeVariables for more information.
+     *
+     * @return array
+     */
     public function getTemplateVarConfiguration()
     {
         $quantity_discount_price = Configuration::get('PS_DISPLAY_DISCOUNT_PRICE');
@@ -1655,9 +1617,16 @@ class FrontControllerCore extends Controller
 
     protected function getDisplayTaxesLabel()
     {
-        return (Module::isEnabled('ps_legalcompliance') && (bool) Configuration::get('AEUC_LABEL_TAX_INC_EXC')) || $this->context->country->display_tax_label;
+        return $this->context->country->display_tax_label;
     }
 
+    /**
+     * Initializes information about currently used currency, available for use in the template.
+     *
+     * @see FrontController::assignGeneralPurposeVariables for more information.
+     *
+     * @return array
+     */
     public function getTemplateVarCurrency()
     {
         $curr = [];
@@ -1669,6 +1638,13 @@ class FrontControllerCore extends Controller
         return $curr;
     }
 
+    /**
+     * Initializes information about current customer, available for use in the template.
+     *
+     * @see FrontController::assignGeneralPurposeVariables for more information.
+     *
+     * @return array
+     */
     public function getTemplateVarCustomer($customer = null)
     {
         if (Validate::isLoadedObject($customer)) {
@@ -1710,11 +1686,11 @@ class FrontControllerCore extends Controller
      */
     public function getShopLogo(): array
     {
-        if (!Configuration::hasKey('PS_LOGO')) {
+        $logoFileName = Configuration::get('PS_LOGO');
+        if (!$logoFileName) {
             return [];
         }
 
-        $logoFileName = Configuration::get('PS_LOGO');
         $logoFileDir = _PS_IMG_DIR_ . $logoFileName;
 
         if (!file_exists($logoFileDir)) {
@@ -1735,6 +1711,12 @@ class FrontControllerCore extends Controller
         return $this->context->shop->physical_uri . 'themes/';
     }
 
+    /**
+     * Initializes a set of commonly used information about the shop, available for use
+     * in the template. @see FrontController::assignGeneralPurposeVariables for more information.
+     *
+     * @return array
+     */
     public function getTemplateVarShop()
     {
         $address = $this->context->shop->getAddress();
@@ -1744,6 +1726,7 @@ class FrontControllerCore extends Controller
 
         $shop = [
             'id' => $this->context->shop->id,
+            'group_id' => $this->context->shop->id_shop_group,
             'name' => Configuration::get('PS_SHOP_NAME'),
             'email' => Configuration::get('PS_SHOP_EMAIL'),
             'registration_number' => Configuration::get('PS_SHOP_DETAILS'),
@@ -1751,10 +1734,10 @@ class FrontControllerCore extends Controller
             'long' => Configuration::get('PS_STORES_CENTER_LONG'),
             'lat' => Configuration::get('PS_STORES_CENTER_LAT'),
 
-            'logo' => Configuration::hasKey('PS_LOGO') ? $psImageUrl . Configuration::get('PS_LOGO') : '',
+            'logo' => self::configuredImageUrl('PS_LOGO', $psImageUrl),
             'logo_details' => $this->getShopLogo(),
-            'stores_icon' => Configuration::hasKey('PS_STORES_ICON') ? $psImageUrl . Configuration::get('PS_STORES_ICON') : '',
-            'favicon' => Configuration::hasKey('PS_FAVICON') ? $psImageUrl . Configuration::get('PS_FAVICON') : '',
+            'stores_icon' => self::configuredImageUrl('PS_STORES_ICON', $psImageUrl),
+            'favicon' => self::configuredImageUrl('PS_FAVICON', $psImageUrl),
             'favicon_update_time' => Configuration::get('PS_IMG_UPDATE_TIME'),
 
             'address' => [
@@ -1773,6 +1756,19 @@ class FrontControllerCore extends Controller
         return $shop;
     }
 
+    private static function configuredImageUrl(string $configKey, $psImageUrl)
+    {
+        $image = Configuration::get($configKey);
+
+        return $image ? $psImageUrl . $image : '';
+    }
+
+    /**
+     * Initializes a set of commonly used variables related to the current page, available for use
+     * in the template. @see FrontController::assignGeneralPurposeVariables for more information.
+     *
+     * @return array
+     */
     public function getTemplateVarPage()
     {
         $page_name = $this->getPageName();
@@ -1808,7 +1804,6 @@ class FrontControllerCore extends Controller
             'meta' => [
                 'title' => $meta_tags['meta_title'],
                 'description' => $meta_tags['meta_description'],
-                'keywords' => $meta_tags['meta_keywords'],
                 'robots' => 'index',
             ],
             'page_name' => $page_name,
@@ -1859,6 +1854,11 @@ class FrontControllerCore extends Controller
         return $page;
     }
 
+    /**
+     * Returns a list of breadcrumbs with their count to show on the current page.
+     *
+     * @return array
+     */
     public function getBreadcrumb()
     {
         $breadcrumb = $this->getBreadcrumbLinks();
@@ -1867,6 +1867,12 @@ class FrontControllerCore extends Controller
         return $breadcrumb;
     }
 
+    /**
+     * Returns an array of breadcrumbs for current controller. Inheriting controllers should
+     * extend this list in most cases.
+     *
+     * @return array
+     */
     protected function getBreadcrumbLinks()
     {
         $breadcrumb = [];
@@ -1889,6 +1895,11 @@ class FrontControllerCore extends Controller
         }
     }
 
+    /**
+     * Returns breadcrumb step for "Your account" page.
+     *
+     * @return array
+     */
     protected function addMyAccountToBreadcrumb()
     {
         return [
@@ -1910,48 +1921,11 @@ class FrontControllerCore extends Controller
     }
 
     /**
-     * Generate a URL corresponding to the current page but
-     * with the query string altered.
-     *
-     * If $extraParams is set to NULL, then all query params are stripped.
-     *
-     * Otherwise, params from $extraParams that have a null value are stripped,
-     * and other params are added. Params not in $extraParams are unchanged.
+     * @deprecated Since 9.0 and will be removed in the next major.
      */
-    protected function updateQueryString(array $extraParams = null)
+    protected function updateQueryString(?array $extraParams = null)
     {
-        $uriWithoutParams = explode('?', $_SERVER['REQUEST_URI'])[0];
-        $url = Tools::getCurrentUrlProtocolPrefix() . $_SERVER['HTTP_HOST'] . $uriWithoutParams;
-        $params = [];
-        $paramsFromUri = '';
-        if (strpos($_SERVER['REQUEST_URI'], '?') !== false) {
-            $paramsFromUri = explode('?', $_SERVER['REQUEST_URI'])[1];
-        }
-        parse_str($paramsFromUri, $params);
-
-        if (null !== $extraParams) {
-            foreach ($extraParams as $key => $value) {
-                if (null === $value) {
-                    unset($params[$key]);
-                } else {
-                    $params[$key] = $value;
-                }
-            }
-        }
-
-        if (null !== $extraParams) {
-            foreach ($params as $key => $param) {
-                if ('' === $param) {
-                    unset($params[$key]);
-                }
-            }
-        } else {
-            $params = [];
-        }
-
-        $queryString = str_replace('%2F', '/', http_build_query($params, '', '&'));
-
-        return $url . ($queryString ? "?$queryString" : '');
+        return Tools::updateCurrentQueryString($extraParams);
     }
 
     protected function getCurrentURL()
@@ -2146,9 +2120,13 @@ class FrontControllerCore extends Controller
     /**
      * {@inheritdoc}
      */
-    protected function buildContainer()
+    protected function buildContainer(): ContainerInterface
     {
-        return ContainerBuilder::getContainer('front', _PS_MODE_DEV_);
+        if (!defined('FRONT_LEGACY_CONTEXT') || FRONT_LEGACY_CONTEXT) {
+            return ContainerBuilder::getContainer('front', _PS_MODE_DEV_);
+        }
+
+        return SymfonyContainer::getInstance();
     }
 
     /**

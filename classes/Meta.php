@@ -1,30 +1,9 @@
 <?php
 /**
- * Copyright since 2007 PrestaShop SA and Contributors
- * PrestaShop is an International Registered Trademark & Property of PrestaShop SA
- *
- * NOTICE OF LICENSE
- *
- * This source file is subject to the Open Software License (OSL 3.0)
- * that is bundled with this package in the file LICENSE.md.
- * It is also available through the world-wide-web at this URL:
- * https://opensource.org/licenses/OSL-3.0
- * If you did not receive a copy of the license and are unable to
- * obtain it through the world-wide-web, please send an email
- * to license@prestashop.com so we can send you a copy immediately.
- *
- * DISCLAIMER
- *
- * Do not edit or add to this file if you wish to upgrade PrestaShop to newer
- * versions in the future. If you wish to customize PrestaShop for your
- * needs please refer to https://devdocs.prestashop.com/ for more information.
- *
- * @author    PrestaShop SA and Contributors <contact@prestashop.com>
- * @copyright Since 2007 PrestaShop SA and Contributors
- * @license   https://opensource.org/licenses/OSL-3.0 Open Software License (OSL 3.0)
+ * For the full copyright and license information, please view the
+ * docs/licenses/LICENSE.txt file that was distributed with this source code.
  */
 use PrestaShop\PrestaShop\Adapter\Presenter\Object\ObjectPresenter;
-use Symfony\Component\HttpFoundation\IpUtils;
 
 /**
  * Class MetaCore.
@@ -35,7 +14,6 @@ class MetaCore extends ObjectModel
     public $configurable = 1;
     public $title;
     public $description;
-    public $keywords;
     public $url_rewrite;
 
     /**
@@ -53,7 +31,6 @@ class MetaCore extends ObjectModel
             /* Lang fields */
             'title' => ['type' => self::TYPE_STRING, 'lang' => true, 'validate' => 'isGenericName', 'size' => 128],
             'description' => ['type' => self::TYPE_STRING, 'lang' => true, 'validate' => 'isGenericName', 'size' => 255],
-            'keywords' => ['type' => self::TYPE_STRING, 'lang' => true, 'validate' => 'isGenericName', 'size' => 255],
             'url_rewrite' => ['type' => self::TYPE_STRING, 'lang' => true, 'validate' => 'isLinkRewrite', 'size' => 255],
         ],
     ];
@@ -70,14 +47,14 @@ class MetaCore extends ObjectModel
     {
         $selectedPages = [];
         if (!$files = Tools::scandir(_PS_CORE_DIR_ . DIRECTORY_SEPARATOR . 'controllers' . DIRECTORY_SEPARATOR . 'front' . DIRECTORY_SEPARATOR, 'php', '', true)) {
-            die(Tools::displayError(Context::getContext()->getTranslator()->trans('Cannot scan root directory', [], 'Admin.Notifications.Error')));
+            throw new PrestaShopException(Context::getContext()->getTranslator()->trans('Cannot scan root directory', [], 'Admin.Notifications.Error'));
         }
 
         $overrideDir = _PS_CORE_DIR_ . DIRECTORY_SEPARATOR . 'override' . DIRECTORY_SEPARATOR . 'controllers' . DIRECTORY_SEPARATOR . 'front' . DIRECTORY_SEPARATOR;
         if (!is_dir($overrideDir)) {
             $overrideFiles = [];
         } elseif (!$overrideFiles = Tools::scandir($overrideDir, 'php', '', true)) {
-            die(Tools::displayError(Context::getContext()->getTranslator()->trans('Cannot scan "override" directory', [], 'Admin.Notifications.Error')));
+            throw new PrestaShopException(Context::getContext()->getTranslator()->trans('Cannot scan "override" directory', [], 'Admin.Notifications.Error'));
         }
 
         $files = array_values(array_unique(array_merge($files, $overrideFiles)));
@@ -252,11 +229,8 @@ class MetaCore extends ObjectModel
      *
      * @return bool
      */
-    public function deleteSelection($selection)
+    public function deleteSelection(array $selection)
     {
-        if (!is_array($selection)) {
-            die(Tools::displayError('Parameter "selection" must be an array.'));
-        }
         $result = true;
         foreach ($selection as $id) {
             $this->id = (int) $id;
@@ -292,13 +266,10 @@ class MetaCore extends ObjectModel
 
     /**
      * Get meta tags.
-     *
-     * @since 1.5.0
      */
     public static function getMetaTags($idLang, $pageName, $title = '')
     {
-        if (Configuration::get('PS_SHOP_ENABLE')
-            || IpUtils::checkIp(Tools::getRemoteAddr(), explode(',', Configuration::get('PS_MAINTENANCE_IP')))) {
+        if (Configuration::get('PS_SHOP_ENABLE') || Tools::isAllowedToBypassMaintenance()) {
             if ($pageName == 'product' && ($idProduct = Tools::getValue('id_product'))) {
                 return Meta::getProductMetas($idProduct, $idLang, $pageName);
             } elseif ($pageName == 'category' && ($idCategory = Tools::getValue('id_category'))) {
@@ -324,15 +295,12 @@ class MetaCore extends ObjectModel
      * @param string $pageName Page name
      *
      * @return array Meta tags
-     *
-     * @since 1.5.0
      */
     public static function getHomeMetas($idLang, $pageName)
     {
         $metas = Meta::getMetaByPage($pageName, $idLang);
         $ret['meta_title'] = (isset($metas['title']) && $metas['title']) ? $metas['title'] : Configuration::get('PS_SHOP_NAME');
         $ret['meta_description'] = (isset($metas['description']) && $metas['description']) ? $metas['description'] : '';
-        $ret['meta_keywords'] = (isset($metas['keywords']) && $metas['keywords']) ? $metas['keywords'] : '';
         $ret = Meta::completeMetaTags($ret, $ret['meta_title']);
 
         return $ret;
@@ -346,8 +314,6 @@ class MetaCore extends ObjectModel
      * @param string $pageName
      *
      * @return array
-     *
-     * @since 1.5.0
      */
     public static function getProductMetas($idProduct, $idLang, $pageName)
     {
@@ -372,8 +338,6 @@ class MetaCore extends ObjectModel
      * @param string $pageName
      *
      * @return array
-     *
-     * @since 1.5.0
      */
     public static function getCategoryMetas($idCategory, $idLang, $pageName, $title = '')
     {
@@ -413,8 +377,6 @@ class MetaCore extends ObjectModel
      * @param string $pageName
      *
      * @return array
-     *
-     * @since 1.5.0
      */
     public static function getManufacturerMetas($idManufacturer, $idLang, $pageName)
     {
@@ -440,8 +402,6 @@ class MetaCore extends ObjectModel
      * @param string $pageName
      *
      * @return array
-     *
-     * @since 1.5.0
      */
     public static function getSupplierMetas($idSupplier, $idLang, $pageName)
     {
@@ -466,8 +426,6 @@ class MetaCore extends ObjectModel
      * @param string $pageName
      *
      * @return array
-     *
-     * @since 1.5.0
      */
     public static function getCmsMetas($idCms, $idLang, $pageName)
     {
@@ -490,8 +448,6 @@ class MetaCore extends ObjectModel
      * @param string $pageName
      *
      * @return array
-     *
-     * @since 1.5.0
      */
     public static function getCmsCategoryMetas($idCmsCategory, $idLang, $pageName)
     {
@@ -506,10 +462,7 @@ class MetaCore extends ObjectModel
         return Meta::getHomeMetas($idLang, $pageName);
     }
 
-    /**
-     * @since 1.5.0
-     */
-    public static function completeMetaTags($metaTags, $defaultValue, Context $context = null)
+    public static function completeMetaTags($metaTags, $defaultValue, ?Context $context = null)
     {
         if (!$context) {
             $context = Context::getContext();

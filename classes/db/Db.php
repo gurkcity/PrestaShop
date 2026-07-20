@@ -1,27 +1,7 @@
 <?php
 /**
- * Copyright since 2007 PrestaShop SA and Contributors
- * PrestaShop is an International Registered Trademark & Property of PrestaShop SA
- *
- * NOTICE OF LICENSE
- *
- * This source file is subject to the Open Software License (OSL 3.0)
- * that is bundled with this package in the file LICENSE.md.
- * It is also available through the world-wide-web at this URL:
- * https://opensource.org/licenses/OSL-3.0
- * If you did not receive a copy of the license and are unable to
- * obtain it through the world-wide-web, please send an email
- * to license@prestashop.com so we can send you a copy immediately.
- *
- * DISCLAIMER
- *
- * Do not edit or add to this file if you wish to upgrade PrestaShop to newer
- * versions in the future. If you wish to customize PrestaShop for your
- * needs please refer to https://devdocs.prestashop.com/ for more information.
- *
- * @author    PrestaShop SA and Contributors <contact@prestashop.com>
- * @copyright Since 2007 PrestaShop SA and Contributors
- * @license   https://opensource.org/licenses/OSL-3.0 Open Software License (OSL 3.0)
+ * For the full copyright and license information, please view the
+ * docs/licenses/LICENSE.txt file that was distributed with this source code.
  */
 /**
  * Class DbCore.
@@ -214,7 +194,7 @@ abstract class DbCore
         static $id = 0;
 
         // This MUST not be declared with the class members because some defines (like _DB_SERVER_) may not exist yet (the constructor can be called directly with params)
-        if (!self::$_servers) {
+        if (!self::$_servers && defined('_DB_SERVER_') && defined('_DB_USER_') && defined('_DB_PASSWD_') && defined('_DB_NAME_')) {
             self::$_servers = [
                 ['server' => _DB_SERVER_, 'user' => _DB_USER_, 'password' => _DB_PASSWD_, 'database' => _DB_NAME_], /* MySQL Master server */
             ];
@@ -233,6 +213,10 @@ abstract class DbCore
         }
 
         if (!isset(self::$instance[$id_server])) {
+            if (!isset(self::$_servers[$id_server])) {
+                throw new PrestaShopException('Database server configuration not found');
+            }
+
             $class = Db::getClass();
             self::$instance[$id_server] = new $class(
                 self::$_servers[$id_server]['server'],
@@ -278,7 +262,7 @@ abstract class DbCore
 
         // Add here your slave(s) server(s) in this file
         if (file_exists(_PS_ROOT_DIR_ . '/config/db_slave_server.inc.php')) {
-            self::$_servers = array_merge(self::$_servers, require(_PS_ROOT_DIR_ . '/config/db_slave_server.inc.php'));
+            self::$_servers = array_merge(self::$_servers, require (_PS_ROOT_DIR_ . '/config/db_slave_server.inc.php'));
         }
 
         self::$_slave_servers_loaded = true;
@@ -293,7 +277,7 @@ abstract class DbCore
     {
         $class = '';
         /* @phpstan-ignore-next-line */
-        if (PHP_VERSION_ID >= 50200 && extension_loaded('pdo_mysql')) {
+        if (extension_loaded('pdo_mysql')) {
             $class = 'DbPDO';
         } elseif (extension_loaded('mysqli')) {
             $class = 'DbMySQLi';
@@ -469,7 +453,7 @@ abstract class DbCore
         }
         $keys_stringified = implode(', ', $keys);
 
-        $sql = $insert_keyword . ' INTO `' . $table . '` (' . $keys_stringified . ') VALUES ' . implode(', ', $values_stringified);
+        $sql = $insert_keyword . ' INTO `' . bqSQL($table) . '` (' . $keys_stringified . ') VALUES ' . implode(', ', $values_stringified);
         if ($type == Db::ON_DUPLICATE_KEY) {
             $sql .= ' ON DUPLICATE KEY UPDATE ' . substr($duplicate_key_stringified, 0, -1);
         }

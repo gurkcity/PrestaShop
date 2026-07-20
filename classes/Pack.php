@@ -1,27 +1,7 @@
 <?php
 /**
- * Copyright since 2007 PrestaShop SA and Contributors
- * PrestaShop is an International Registered Trademark & Property of PrestaShop SA
- *
- * NOTICE OF LICENSE
- *
- * This source file is subject to the Open Software License (OSL 3.0)
- * that is bundled with this package in the file LICENSE.md.
- * It is also available through the world-wide-web at this URL:
- * https://opensource.org/licenses/OSL-3.0
- * If you did not receive a copy of the license and are unable to
- * obtain it through the world-wide-web, please send an email
- * to license@prestashop.com so we can send you a copy immediately.
- *
- * DISCLAIMER
- *
- * Do not edit or add to this file if you wish to upgrade PrestaShop to newer
- * versions in the future. If you wish to customize PrestaShop for your
- * needs please refer to https://devdocs.prestashop.com/ for more information.
- *
- * @author    PrestaShop SA and Contributors <contact@prestashop.com>
- * @copyright Since 2007 PrestaShop SA and Contributors
- * @license   https://opensource.org/licenses/OSL-3.0 Open Software License (OSL 3.0)
+ * For the full copyright and license information, please view the
+ * docs/licenses/LICENSE.txt file that was distributed with this source code.
  */
 
 use PrestaShop\PrestaShop\Core\Domain\Product\Pack\ValueObject\PackStockType;
@@ -86,6 +66,8 @@ class PackCore extends Product
         }
 
         if (!array_key_exists($id_product, self::$cacheIsPack)) {
+            // This is not very efficient, isn't an entry in pack table a proof that it's a pack?
+            // Moreover, we already have cache_is_pack column, product_type is just a duplicate.
             $result = Db::getInstance()->getValue('SELECT COUNT(*) FROM `' . _DB_PREFIX_ . 'pack` WHERE id_product_pack = ' . (int) $id_product);
             $productType = Db::getInstance()->getValue('SELECT product_type FROM `' . _DB_PREFIX_ . 'product` WHERE id_product = ' . (int) $id_product);
             self::$cacheIsPack[$id_product] = ($result > 0) || $productType === ProductType::TYPE_PACK;
@@ -135,7 +117,7 @@ class PackCore extends Product
         $price_display_method = !self::$_taxCalculationMethod;
         $items = Pack::getItems($id_product, Configuration::get('PS_LANG_DEFAULT'));
         foreach ($items as $item) {
-            $pricePerItem = $item->getPrice($price_display_method, ($item->id_pack_product_attribute ? $item->id_pack_product_attribute : null));
+            $pricePerItem = $item->getPrice($price_display_method, $item->id_pack_product_attribute ? $item->id_pack_product_attribute : null);
 
             // Different calculation depending on rounding type
             switch (Configuration::get('PS_ROUND_TYPE')) {
@@ -233,7 +215,7 @@ class PackCore extends Product
      *
      * @throws PrestaShopException
      */
-    public static function isInStock($idProduct, $wantedQuantity = 1, Cart $cart = null)
+    public static function isInStock($idProduct, $wantedQuantity = 1, ?Cart $cart = null)
     {
         if (!Pack::isFeatureActive()) {
             return true;
@@ -241,7 +223,7 @@ class PackCore extends Product
         $idProduct = (int) $idProduct;
         $wantedQuantity = (int) $wantedQuantity;
         $product = new Product($idProduct, false);
-        $packQuantity = self::getQuantity($idProduct, null, null, $cart);
+        $packQuantity = self::getQuantity($idProduct, null, null, $cart, false);
 
         if ($product->isAvailableWhenOutOfStock($product->out_of_stock)) {
             return true;
@@ -262,7 +244,7 @@ class PackCore extends Product
      * @param int|null $idProductAttribute Product attribute id (optional)
      * @param bool|null $cacheIsPack (unused, you can pass null)
      * @param CartCore|null $cart Pass if you want to reduce the quantity by amount in cart
-     * @param int|null $idCustomization Product customization id (optional)
+     * @param int|bool|null $idCustomization Product customization id (optional)
      *
      * @return int
      *
@@ -272,7 +254,7 @@ class PackCore extends Product
         $idProduct,
         $idProductAttribute = null,
         $cacheIsPack = null,
-        CartCore $cart = null,
+        ?CartCore $cart = null,
         $idCustomization = null
     ) {
         $idProduct = (int) $idProduct;
@@ -418,19 +400,13 @@ class PackCore extends Product
             $line = Product::getTaxesInformations($line);
         }
 
-        if (!$full) {
-            return $result;
-        }
-
-        $array_result = [];
-        foreach ($result as $prow) {
-            if (!Pack::isPack($prow['id_product'])) {
-                $prow['id_product_attribute'] = (int) $prow['id_product_attribute_item'];
-                $array_result[] = Product::getProductProperties($id_lang, $prow);
+        foreach ($result as $k => $v) {
+            if (!Pack::isPack($v['id_product'])) {
+                $result[$k]['id_product_attribute'] = (int) $v['id_product_attribute_item'];
             }
         }
 
-        return $array_result;
+        return $result;
     }
 
     public static function getPacksTable($id_product, $id_lang, $full = false, $limit = null)
@@ -475,7 +451,7 @@ class PackCore extends Product
         $array_result = [];
         foreach ($result as $row) {
             if (!Pack::isPacked($row['id_product'])) {
-                $array_result[] = Product::getProductProperties($id_lang, $row);
+                $array_result[] = $row;
             }
         }
 
@@ -489,9 +465,9 @@ class PackCore extends Product
             $result = Db::getInstance()->update('product', ['cache_is_pack' => 0], 'id_product = ' . (int) $id_product);
         }
 
-        return $result &&
-            Db::getInstance()->execute('DELETE FROM `' . _DB_PREFIX_ . 'pack` WHERE `id_product_pack` = ' . (int) $id_product) &&
-            Configuration::updateGlobalValue('PS_PACK_FEATURE_ACTIVE', Pack::isCurrentlyUsed());
+        return $result
+            && Db::getInstance()->execute('DELETE FROM `' . _DB_PREFIX_ . 'pack` WHERE `id_product_pack` = ' . (int) $id_product)
+            && Configuration::updateGlobalValue('PS_PACK_FEATURE_ACTIVE', Pack::isCurrentlyUsed());
     }
 
     /**
@@ -510,8 +486,8 @@ class PackCore extends Product
     {
         $id_attribute_item = (int) $id_attribute_item ? (int) $id_attribute_item : Product::getDefaultAttribute((int) $id_item);
 
-        return Db::getInstance()->update('product', ['cache_is_pack' => 1, 'product_type' => ProductType::TYPE_PACK], 'id_product = ' . (int) $id_product) &&
-            Db::getInstance()->insert('pack', [
+        return Db::getInstance()->update('product', ['cache_is_pack' => 1, 'product_type' => ProductType::TYPE_PACK], 'id_product = ' . (int) $id_product)
+            && Db::getInstance()->insert('pack', [
                 'id_product_pack' => (int) $id_product,
                 'id_product_item' => (int) $id_item,
                 'id_product_attribute_item' => (int) $id_attribute_item,
@@ -532,8 +508,6 @@ class PackCore extends Product
     /**
      * This method is allow to know if a feature is used or active.
      *
-     * @since 1.5.0.1
-     *
      * @return bool
      */
     public static function isFeatureActive()
@@ -543,8 +517,6 @@ class PackCore extends Product
 
     /**
      * This method is allow to know if a Pack entity is currently used.
-     *
-     * @since 1.5.0
      *
      * @param string|null $table Name of table linked to entity
      * @param bool $has_active_column True if the table has an active column
@@ -566,21 +538,16 @@ class PackCore extends Product
      * @param int $id_product id_pack
      *
      * @return bool
+     *
+     * @deprecated Since 9.0 and will be removed in 10.0
      */
     public static function usesAdvancedStockManagement($id_product)
     {
-        if (!Pack::isPack($id_product)) {
-            return false;
-        }
+        @trigger_error(sprintf(
+            '%s is deprecated since 9.0 and will be removed in 10.0.',
+            __METHOD__
+        ), E_USER_DEPRECATED);
 
-        $products = Pack::getItems($id_product, Configuration::get('PS_LANG_DEFAULT'));
-        foreach ($products as $product) {
-            // if one product uses the advanced stock management
-            if ($product->advanced_stock_management == 1) {
-                return true;
-            }
-        }
-        // not used
         return false;
     }
 
@@ -590,29 +557,24 @@ class PackCore extends Product
      * @param int $id_product id_pack
      *
      * @return bool
+     *
+     * @deprecated Since 9.0 and will be removed in 10.0
      */
     public static function allUsesAdvancedStockManagement($id_product)
     {
-        if (!Pack::isPack($id_product)) {
-            return false;
-        }
+        @trigger_error(sprintf(
+            '%s is deprecated since 9.0 and will be removed in 10.0.',
+            __METHOD__
+        ), E_USER_DEPRECATED);
 
-        $products = Pack::getItems($id_product, Configuration::get('PS_LANG_DEFAULT'));
-        foreach ($products as $product) {
-            // if one product uses the advanced stock management
-            if ($product->advanced_stock_management == 0) {
-                return false;
-            }
-        }
-        // not used
-        return true;
+        return false;
     }
 
     /**
-     * Returns Packs that contains the given product in the right declinaison.
+     * Returns Packs that contains the given product in the right combination.
      *
      * @param int $id_item Product item id that could be contained in a|many pack(s)
-     * @param int $id_attribute_item The declinaison of the product
+     * @param int $id_attribute_item The combination of the product
      * @param int $id_lang
      *
      * @return array[Product] Packs that contains the given product

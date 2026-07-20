@@ -1,27 +1,7 @@
 <?php
 /**
- * Copyright since 2007 PrestaShop SA and Contributors
- * PrestaShop is an International Registered Trademark & Property of PrestaShop SA
- *
- * NOTICE OF LICENSE
- *
- * This source file is subject to the Open Software License (OSL 3.0)
- * that is bundled with this package in the file LICENSE.md.
- * It is also available through the world-wide-web at this URL:
- * https://opensource.org/licenses/OSL-3.0
- * If you did not receive a copy of the license and are unable to
- * obtain it through the world-wide-web, please send an email
- * to license@prestashop.com so we can send you a copy immediately.
- *
- * DISCLAIMER
- *
- * Do not edit or add to this file if you wish to upgrade PrestaShop to newer
- * versions in the future. If you wish to customize PrestaShop for your
- * needs please refer to https://devdocs.prestashop.com/ for more information.
- *
- * @author    PrestaShop SA and Contributors <contact@prestashop.com>
- * @copyright Since 2007 PrestaShop SA and Contributors
- * @license   https://opensource.org/licenses/OSL-3.0 Open Software License (OSL 3.0)
+ * For the full copyright and license information, please view the
+ * docs/licenses/LICENSE.txt file that was distributed with this source code.
  */
 
 /**
@@ -100,7 +80,7 @@ class FeatureCore extends ObjectModel
      *
      * @return bool Deletion result
      */
-    public function deleteSelection($selection)
+    public function deleteSelection(array $selection)
     {
         /* Also delete Attributes */
         foreach ($selection as $value) {
@@ -155,7 +135,7 @@ class FeatureCore extends ObjectModel
         foreach ($fields as $field) {
             foreach (array_keys($field) as $key) {
                 if (!Validate::isTableOrIdentifier($key)) {
-                    die(Tools::displayError('Invalid column name in feature_lang table.'));
+                    throw new PrestaShopException('Invalid column name in feature_lang table.');
                 }
             }
 
@@ -163,8 +143,8 @@ class FeatureCore extends ObjectModel
 					WHERE `' . $this->def['primary'] . '` = ' . (int) $this->id . '
 						AND `id_lang` = ' . (int) $field['id_lang'];
             $mode = Db::getInstance()->getRow($sql);
-            $result = $result &&
-                (!$mode
+            $result = $result
+                && (!$mode
                     ? Db::getInstance()->insert($this->def['table'] . '_lang', $field)
                     : Db::getInstance()->update(
                         $this->def['table'] . '_lang',
@@ -231,7 +211,7 @@ class FeatureCore extends ObjectModel
      *
      * @param int $idLang Language id
      *
-     *@return int Number of feature
+     * @return int Number of feature
      */
     public static function nbFeatures($idLang)
     {
@@ -290,8 +270,6 @@ class FeatureCore extends ObjectModel
      * This metohd is allow to know if a feature is used or active.
      *
      * @return bool
-     *
-     * @since 1.5.0.1
      */
     public static function isFeatureActive()
     {

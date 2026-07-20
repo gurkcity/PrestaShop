@@ -1,27 +1,7 @@
 <?php
 /**
- * Copyright since 2007 PrestaShop SA and Contributors
- * PrestaShop is an International Registered Trademark & Property of PrestaShop SA
- *
- * NOTICE OF LICENSE
- *
- * This source file is subject to the Open Software License (OSL 3.0)
- * that is bundled with this package in the file LICENSE.md.
- * It is also available through the world-wide-web at this URL:
- * https://opensource.org/licenses/OSL-3.0
- * If you did not receive a copy of the license and are unable to
- * obtain it through the world-wide-web, please send an email
- * to license@prestashop.com so we can send you a copy immediately.
- *
- * DISCLAIMER
- *
- * Do not edit or add to this file if you wish to upgrade PrestaShop to newer
- * versions in the future. If you wish to customize PrestaShop for your
- * needs please refer to https://devdocs.prestashop.com/ for more information.
- *
- * @author    PrestaShop SA and Contributors <contact@prestashop.com>
- * @copyright Since 2007 PrestaShop SA and Contributors
- * @license   https://opensource.org/licenses/OSL-3.0 Open Software License (OSL 3.0)
+ * For the full copyright and license information, please view the
+ * docs/licenses/LICENSE.txt file that was distributed with this source code.
  */
 
 namespace PrestaShop\PrestaShop\Core\Grid\Definition\Factory;
@@ -37,7 +17,6 @@ use PrestaShop\PrestaShop\Core\Grid\Definition\GridDefinition;
 use PrestaShop\PrestaShop\Core\Grid\Filter\FilterCollection;
 use PrestaShop\PrestaShop\Core\Grid\Filter\FilterCollectionInterface;
 use PrestaShop\PrestaShop\Core\Hook\HookDispatcherInterface;
-use PrestaShopBundle\Event\Dispatcher\NullDispatcher;
 use PrestaShopBundle\Translation\TranslatorAwareTrait;
 use Symfony\Component\DependencyInjection\Container;
 
@@ -54,34 +33,17 @@ abstract class AbstractGridDefinitionFactory implements GridDefinitionFactoryInt
     protected $hookDispatcher;
 
     /**
-     * @param HookDispatcherInterface|null $hookDispatcher
-     */
-    public function __construct(HookDispatcherInterface $hookDispatcher = null)
-    {
-        if (null === $hookDispatcher) {
-            @trigger_error('The $hookDispatcher parameter should not be null, inject your main HookDispatcherInterface service, or NullDispatcher if you don\'t need hooks.', E_USER_DEPRECATED);
-        }
-        $this->hookDispatcher = $hookDispatcher ? $hookDispatcher : new NullDispatcher();
-    }
-
-    /**
-     * Set hook dispatcher.
-     *
      * @param HookDispatcherInterface $hookDispatcher
-     *
-     * @deprecated
      */
-    final public function setHookDispatcher(HookDispatcherInterface $hookDispatcher)
+    public function __construct(HookDispatcherInterface $hookDispatcher)
     {
-        @trigger_error('The AbstractGridDefinitionFactory::setHookDispatcher method is deprecated as of 1.7.5.1 Please use the constructor instead', E_USER_DEPRECATED);
-
         $this->hookDispatcher = $hookDispatcher;
     }
 
     /**
      * {@inheritdoc}
      */
-    final public function getDefinition()
+    public function getDefinition()
     {
         $definition = new GridDefinition(
             $this->getId(),

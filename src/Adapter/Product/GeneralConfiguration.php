@@ -1,27 +1,7 @@
 <?php
 /**
- * Copyright since 2007 PrestaShop SA and Contributors
- * PrestaShop is an International Registered Trademark & Property of PrestaShop SA
- *
- * NOTICE OF LICENSE
- *
- * This source file is subject to the Open Software License (OSL 3.0)
- * that is bundled with this package in the file LICENSE.md.
- * It is also available through the world-wide-web at this URL:
- * https://opensource.org/licenses/OSL-3.0
- * If you did not receive a copy of the license and are unable to
- * obtain it through the world-wide-web, please send an email
- * to license@prestashop.com so we can send you a copy immediately.
- *
- * DISCLAIMER
- *
- * Do not edit or add to this file if you wish to upgrade PrestaShop to newer
- * versions in the future. If you wish to customize PrestaShop for your
- * needs please refer to https://devdocs.prestashop.com/ for more information.
- *
- * @author    PrestaShop SA and Contributors <contact@prestashop.com>
- * @copyright Since 2007 PrestaShop SA and Contributors
- * @license   https://opensource.org/licenses/OSL-3.0 Open Software License (OSL 3.0)
+ * For the full copyright and license information, please view the
+ * docs/licenses/LICENSE.txt file that was distributed with this source code.
  */
 
 namespace PrestaShop\PrestaShop\Adapter\Product;
@@ -72,6 +52,7 @@ class GeneralConfiguration implements DataConfigurationInterface
             'short_description_limit' => $this->configuration->get('PS_PRODUCT_SHORT_DESC_LIMIT'),
             'quantity_discount' => $this->configuration->get('PS_QTY_DISCOUNT_ON_COMBINATION'),
             'force_friendly_url' => $this->configuration->getBoolean('PS_FORCE_FRIENDLY_PRODUCT'),
+            'product_breadcrumb_category' => $this->configuration->get('PS_PRODUCT_BREADCRUMB_CATEGORY'),
             'default_status' => $this->configuration->getBoolean('PS_PRODUCT_ACTIVATION_DEFAULT'),
             'specific_price_priorities' => $this->getPrioritiesData(),
             'disabled_products_behavior' => $this->configuration->get('PS_PRODUCT_REDIRECTION_DEFAULT'),
@@ -93,6 +74,7 @@ class GeneralConfiguration implements DataConfigurationInterface
             $this->configuration->set('PS_PRODUCT_SHORT_DESC_LIMIT', (int) $config['short_description_limit']);
             $this->configuration->set('PS_QTY_DISCOUNT_ON_COMBINATION', (int) $config['quantity_discount']);
             $this->configuration->set('PS_FORCE_FRIENDLY_PRODUCT', (int) $config['force_friendly_url']);
+            $this->configuration->set('PS_PRODUCT_BREADCRUMB_CATEGORY', (string) $config['product_breadcrumb_category']);
             $this->configuration->set('PS_PRODUCT_ACTIVATION_DEFAULT', (int) $config['default_status']);
             $this->configuration->set('PS_PRODUCT_REDIRECTION_DEFAULT', (string) $config['disabled_products_behavior']);
             try {
@@ -126,6 +108,7 @@ class GeneralConfiguration implements DataConfigurationInterface
             'short_description_limit',
             'quantity_discount',
             'force_friendly_url',
+            'product_breadcrumb_category',
             'default_status',
             'specific_price_priorities',
             'disabled_products_behavior',

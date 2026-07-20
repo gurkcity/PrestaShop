@@ -1,34 +1,11 @@
 <?php
 /**
- * Copyright since 2007 PrestaShop SA and Contributors
- * PrestaShop is an International Registered Trademark & Property of PrestaShop SA
- *
- * NOTICE OF LICENSE
- *
- * This source file is subject to the Open Software License (OSL 3.0)
- * that is bundled with this package in the file LICENSE.md.
- * It is also available through the world-wide-web at this URL:
- * https://opensource.org/licenses/OSL-3.0
- * If you did not receive a copy of the license and are unable to
- * obtain it through the world-wide-web, please send an email
- * to license@prestashop.com so we can send you a copy immediately.
- *
- * DISCLAIMER
- *
- * Do not edit or add to this file if you wish to upgrade PrestaShop to newer
- * versions in the future. If you wish to customize PrestaShop for your
- * needs please refer to https://devdocs.prestashop.com/ for more information.
- *
- * @author    PrestaShop SA and Contributors <contact@prestashop.com>
- * @copyright Since 2007 PrestaShop SA and Contributors
- * @license   https://opensource.org/licenses/OSL-3.0 Open Software License (OSL 3.0)
+ * For the full copyright and license information, please view the
+ * docs/licenses/LICENSE.txt file that was distributed with this source code.
  */
 
 use PrestaShop\PrestaShop\Core\Util\Sorter;
 
-/**
- * @since 1.5
- */
 class HTMLTemplateInvoiceCore extends HTMLTemplate
 {
     /**
@@ -365,10 +342,6 @@ class HTMLTemplateInvoiceCore extends HTMLTemplate
             'legal_free_text' => $legal_free_text,
         ];
 
-        if (Tools::getValue('debug')) {
-            die(json_encode($data));
-        }
-
         $this->smarty->assign($data);
 
         $tpls = [
@@ -390,12 +363,10 @@ class HTMLTemplateInvoiceCore extends HTMLTemplate
     /**
      * Returns the tax tab content.
      *
-     * @return string|array Tax tab html content (Returns an array if debug params used in request)
+     * @return string|array Tax tab html content
      */
     public function getTaxTabContent()
     {
-        $debug = Tools::getValue('debug');
-
         $address = new Address((int) $this->order->{Configuration::get('PS_TAX_ADDRESS_TYPE')});
         $tax_exempt = Configuration::get('VATNUMBER_MANAGEMENT')
                             && !empty($address->vat_number)
@@ -411,14 +382,10 @@ class HTMLTemplateInvoiceCore extends HTMLTemplate
             'ecotax_tax_breakdown' => $this->order_invoice->getEcoTaxTaxesBreakdown(),
             'wrapping_tax_breakdown' => $this->order_invoice->getWrappingTaxesBreakdown(),
             'tax_breakdowns' => $this->getTaxBreakdown(),
-            'order' => $debug ? null : $this->order,
-            'order_invoice' => $debug ? null : $this->order_invoice,
-            'carrier' => $debug ? null : $carrier,
+            'order' => $this->order,
+            'order_invoice' => $this->order_invoice,
+            'carrier' => $carrier,
         ];
-
-        if ($debug) {
-            return $data;
-        }
 
         $this->smarty->assign($data);
 
